@@ -19,11 +19,11 @@ var assetGedi = 'users/potapovpeter/GEDI_V27/GEDI_SASIA_v27';
 var regions = ee.FeatureCollection(assetRegions);
 
 var nSamplesPerClass = [
-    { 'class_id': 3, 'n_samples': 4000 },
-    { 'class_id': 4, 'n_samples': 7000 },
-    { 'class_id': 12, 'n_samples': 3000 },
+    { 'class_id': 3, 'n_samples': 3000 },
+    { 'class_id': 13, 'n_samples': 2000 },
     { 'class_id': 21, 'n_samples': 3000 },
-    { 'class_id': 33, 'n_samples': 3000 },
+    { 'class_id': 25, 'n_samples': 1000 },
+    { 'class_id': 33, 'n_samples': 1000 },
 ];
 
 var gediThreshPerClass = [
@@ -136,6 +136,42 @@ var stableGedi = ee.List(gediThreshPerClass)
     );
 
 stableGedi = ee.Image(stableGedi);
+
+//
+// Create a drawing tool to build remaping polygons
+// If there aren't polygons, the code works fine
+//
+var drawinfTools = Map.drawingTools();
+
+var geometryList = drawinfTools.layers().map(
+    function (obj) {
+
+        var eeObject = obj.getEeObject();
+
+        return ee.Algorithms.If(
+            ee.String(ee.Algorithms.ObjectType(eeObject)).equals('FeatureCollection'),
+            eeObject,
+            ee.FeatureCollection(eeObject)
+        );
+
+    }
+);
+
+var featCollection = ee.FeatureCollection(geometryList);
+
+// flatten collection of collections into a single collection and
+// removes non-standard data
+featCollection = featCollection.flatten()
+    .filter(ee.Filter.neq('from', null))
+    .filter(ee.Filter.neq('to', null));
+
+print(featCollection);
+
+var imageFrom = ee.Image().paint(featCollection, 'from');
+var imageTo = ee.Image().paint(featCollection, 'to');
+
+// Apply images "from" and "to" to remap stable regions
+stableGedi = stableGedi.where(stableGedi.eq(imageFrom), imageTo);
 
 Map.addLayer(stableGedi, vis, 'Stable + GEDI', true);
 
